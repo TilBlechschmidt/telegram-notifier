@@ -3,8 +3,9 @@ use axum::{
     routing::post,
     Json, Router,
 };
+use axum_auth::AuthBearer;
 use serde::Deserialize;
-use std::{net::SocketAddr, sync::Arc};
+use std::{env, net::SocketAddr, sync::Arc};
 use teloxide::{
     prelude::*,
     types::{ParseMode, Recipient},
@@ -22,12 +23,14 @@ async fn main() {
     log::info!("Starting notification bot...");
 
     let bot = Arc::new(Bot::from_env());
-    let server_bot = bot.clone();
 
-    tokio::spawn(async move {
-        run_server(server_bot).await;
-    });
+    tokio::select! {
+        _ = run_server(bot.clone()) => {},
+        _ = bot_repl(bot) => {}
+    }
+}
 
+async fn bot_repl(bot: Arc<Bot>) {
     teloxide::repl(bot, |bot: Bot, msg: Message| async move {
         bot.send_message(
             msg.chat.id,
@@ -57,9 +60,14 @@ async fn run_server(bot: Arc<Bot>) {
 
 async fn handle_hook(
     Path(chat_id): Path<ChatId>,
+    AuthBearer(token): AuthBearer,
     State(bot): State<Arc<Bot>>,
     Json(payload): Json<MessagePayload>,
 ) -> Result<Json<()>, String> {
+    if token != env::var("BEARER_TOKEN").expect("`BEARER_TOKEN` env var is required but not set") {
+        return Err("Invalid auth".into());
+    }
+
     let user = Recipient::Id(chat_id);
 
     log::debug!("Sending message '{}'", user);

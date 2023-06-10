@@ -12,3 +12,4 @@ pretty_env_logger = "0.4"
 tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
 axum = "0.6.18"
 serde = { version = "1.0.164", features = ["derive"] }
+axum-auth = "0.4.0"
