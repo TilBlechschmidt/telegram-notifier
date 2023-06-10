@@ -31,10 +31,10 @@ async fn main() {
 }
 
 async fn bot_repl(bot: Arc<Bot>) {
-    teloxide::repl(bot, |bot: Bot, msg: Message| async move {
+    teloxide::repl(bot, |bot: Arc<Bot>, msg: Message| async move {
         bot.send_message(
             msg.chat.id,
-            format!("This bot is for sending custom notifications. If you found this randomly, it is probably not for you.\n\nYour personal ID is `{}`", msg.chat.id),
+            format!("This bot is for sending custom notifications\\. If you found this randomly, it is probably not for you\\.\n\nYour personal ID is `{}`", msg.chat.id),
         )
         .parse_mode(ParseMode::MarkdownV2)
         .await?;
