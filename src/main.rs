@@ -1,9 +1,8 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     routing::post,
     Json, Router,
 };
-use axum_auth::AuthBearer;
 use serde::Deserialize;
 use std::{env, net::SocketAddr, process::exit, sync::Arc};
 use teloxide::{
@@ -16,6 +15,15 @@ use tokio::signal::unix::SignalKind;
 struct MessagePayload {
     #[serde(rename = "_message")]
     message: String,
+
+    #[serde(flatten)]
+    settings: SettingsPayload,
+}
+
+#[derive(Deserialize)]
+struct SettingsPayload {
+    #[serde(default)]
+    silent: bool,
 }
 
 #[tokio::main]
@@ -71,11 +79,12 @@ async fn handle_hook(
     State(bot): State<Arc<Bot>>,
     Json(payload): Json<MessagePayload>,
 ) -> Result<Json<()>, String> {
-    send_message(chat_id, bot, payload.message).await
+    send_message(chat_id, bot, payload.message, payload.settings.silent).await
 }
 
 async fn handle_default_hook(
     State(bot): State<Arc<Bot>>,
+    Query(settings): Query<SettingsPayload>,
     payload: String,
 ) -> Result<Json<()>, String> {
     let chat_id = ChatId(
@@ -85,13 +94,19 @@ async fn handle_default_hook(
             .unwrap(),
     );
 
-    send_message(chat_id, bot, payload).await
+    send_message(chat_id, bot, payload, settings.silent).await
 }
 
-async fn send_message(chat_id: ChatId, bot: Arc<Bot>, payload: String) -> Result<Json<()>, String> {
+async fn send_message(
+    chat_id: ChatId,
+    bot: Arc<Bot>,
+    payload: String,
+    silent: bool,
+) -> Result<Json<()>, String> {
     let user = Recipient::Id(chat_id);
     log::debug!("Sending message '{}'", user);
     bot.send_message(user, payload)
+        .disable_notification(silent)
         .await
         .map(|_| ().into())
         .map_err(|e| e.to_string())
