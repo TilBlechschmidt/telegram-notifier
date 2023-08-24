@@ -32,14 +32,21 @@ async fn main() {
     log::info!("Starting notification bot...");
 
     let bot = Arc::new(Bot::from_env());
-    let mut interrupt = tokio::signal::unix::signal(SignalKind::interrupt())
+    let mut sigint = tokio::signal::unix::signal(SignalKind::interrupt())
         .expect("failed to acquire SIGINT listener");
+
+    let mut sigterm = tokio::signal::unix::signal(SignalKind::terminate())
+        .expect("failed to acquire SIGTERM listener");
 
     tokio::select! {
         _ = run_server(bot.clone()) => {},
         _ = bot_repl(bot) => {},
-        _ = interrupt.recv() => {
-            println!("Received interrupt, exiting ...");
+        _ = sigint.recv() => {
+            println!("Received SIGINT, exiting ...");
+            exit(0);
+        },
+        _ = sigterm.recv() => {
+            println!("Received SIGTERM, exiting ...");
             exit(0);
         }
     }
