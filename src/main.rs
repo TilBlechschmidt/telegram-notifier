@@ -24,6 +24,8 @@ struct MessagePayload {
 struct SettingsPayload {
     #[serde(default)]
     silent: bool,
+    #[serde(default)]
+    markdown: bool,
 }
 
 #[tokio::main]
@@ -86,7 +88,7 @@ async fn handle_hook(
     State(bot): State<Arc<Bot>>,
     Json(payload): Json<MessagePayload>,
 ) -> Result<Json<()>, String> {
-    send_message(chat_id, bot, payload.message, payload.settings.silent).await
+    send_message(chat_id, bot, payload.message, payload.settings).await
 }
 
 async fn handle_default_hook(
@@ -101,20 +103,26 @@ async fn handle_default_hook(
             .unwrap(),
     );
 
-    send_message(chat_id, bot, payload, settings.silent).await
+    send_message(chat_id, bot, payload, settings).await
 }
 
 async fn send_message(
     chat_id: ChatId,
     bot: Arc<Bot>,
     payload: String,
-    silent: bool,
+    settings: SettingsPayload,
 ) -> Result<Json<()>, String> {
     let user = Recipient::Id(chat_id);
+
     log::debug!("Sending message '{}'", user);
-    bot.send_message(user, payload)
-        .disable_notification(silent)
-        .await
-        .map(|_| ().into())
-        .map_err(|e| e.to_string())
+
+    let mut message = bot
+        .send_message(user, payload)
+        .disable_notification(settings.silent);
+
+    if settings.markdown {
+        message = message.parse_mode(ParseMode::MarkdownV2);
+    }
+
+    message.await.map(|_| ().into()).map_err(|e| e.to_string())
 }
